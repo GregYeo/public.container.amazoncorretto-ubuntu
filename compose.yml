@@ -8,5 +8,7 @@ services:
     command: bash /test/non_root_user_test.sh
     environment:
       ROOT_USER_SCRIPT: /test/root_user_test.sh
+      TARGET_UID: 1001
+      TARGET_GID: 1001
     volumes:
       - ./test:/test
