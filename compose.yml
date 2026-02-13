@@ -1,0 +1,12 @@
+services:
+  amazoncorretto21-ubuntu24:
+    image: ${ORG_PREFIX}public.container.amazoncorretto-ubuntu:${VERSION_TAG:-amazoncorretto21-ubuntu24}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      #dockerfile: dev.Dockerfile
+    command: bash /test/non_root_user_test.sh
+    environment:
+      ROOT_USER_SCRIPT: /test/root_user_test.sh
+    volumes:
+      - ./test:/test
