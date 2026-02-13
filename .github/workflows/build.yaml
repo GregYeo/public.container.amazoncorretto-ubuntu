@@ -19,6 +19,9 @@ jobs:
     permissions:
       contents: read
       packages: write
+
+    env:
+      COMPOSE_FILE: 'compose.yml:compose.build.yml'
     steps:
       - name: Collect Workflow Telemetry
         uses: catchpoint/workflow-telemetry-action@v2
@@ -43,31 +46,20 @@ jobs:
           REPO_LOWERCASE=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')
           echo "repo_name=ghcr.io/$REPO_LOWERCASE" >> $GITHUB_OUTPUT
 
-      - name: Build
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          platforms: ${{ matrix.platform }}
-          load: true
-          pull: true
-          tags: |
-            ${{ steps.repo_name_step.outputs.repo_name }}:${{ github.sha }}-${{ matrix.platform-tag }}
-          cache-from: type=registry,ref=${{ steps.repo_name_step.outputs.repo_name }}:buildcache-${{ matrix.platform-tag }}
-          cache-to: type=registry,ref=${{ steps.repo_name_step.outputs.repo_name }}:buildcache-${{ matrix.platform-tag }},mode=max
+      - name: Build and Test with Compose
+        env:
+          REPO_NAME: ${{ steps.repo_name_step.outputs.repo_name }}
+          VERSION_TAG: ${{ github.sha }}
+          PLATFORM_TAG: ${{ matrix.platform-tag }}
+          COMPOSE_PROJECT:
+        run: |
+          docker compose build
+          docker compose up
 
-      - name: Test
-        run: docker compose up
-
-      - name: Tag and push
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          platforms: ${{ matrix.platform }}
-          push: true
-          tags: |
-            ${{ steps.repo_name_step.outputs.repo_name }}:${{ github.sha }}-${{ matrix.platform-tag }}
-          cache-from: type=registry,ref=${{ steps.repo_name_step.outputs.repo_name }}:buildcache-${{ matrix.platform-tag }}
-          cache-to: type=registry,ref=${{ steps.repo_name_step.outputs.repo_name }}:buildcache-${{ matrix.platform-tag }},mode=max
+      - name: Push to GHCR
+        if: success()
+        run: |
+          docker compose push
 
   create-manifest:
     name: Create Multi-arch Manifest
@@ -96,12 +88,32 @@ jobs:
           REPO_LOWERCASE=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')
           echo "repo_name=ghcr.io/$REPO_LOWERCASE" >> $GITHUB_OUTPUT
 
-      - name: Create manifest list and push
+      - name: Extract Tag or SHA
+        id: vars
         run: |
-          REPO_NAME=${{ steps.repo_name_step.outputs.repo_name }}
-          TAG_NAME=${{ github.sha }}
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          else
+            # Use short SHA (7 characters) for cleaner tags
+            echo "version=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Discover and Create Multi-arch Manifests
+        env:
+          REPO_NAME: ${{ steps.repo_name_step.outputs.repo_name }}
+          VERSION: ${{ steps.vars.outputs.version }}
+        run: |
+         SERVICES=$(docker compose config --services)
           
-          docker buildx imagetools create \
-            -t "$REPO_NAME:$TAG_NAME" \
-            "$REPO_NAME:$TAG_NAME-linux-amd64" \
-            "$REPO_NAME:$TAG_NAME-linux-arm64"
+          for SERVICE in $SERVICES; do
+            echo "--- Creating Manifest for: $SERVICE ($VERSION) ---"
+      
+            AMD64_SOURCE="$REPO_NAME:$SERVICE-$VERSION-linux-amd64"
+            ARM64_SOURCE="$REPO_NAME:$SERVICE-$VERSION-linux-arm64"
+            
+            # The final clean multi-arch tags
+            docker buildx imagetools create \
+              -t "$REPO_NAME:$SERVICE-$VERSION" \
+              "$AMD64_SOURCE" \
+              "$ARM64_SOURCE"
+          done

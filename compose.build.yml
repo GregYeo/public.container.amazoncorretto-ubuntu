@@ -1,0 +1,7 @@
+services:
+  amazoncorretto21-ubuntu24:
+    build:
+      cache_from:
+        - type=registry,ref=ghcr.io/${REPO_NAME}:amazoncorretto21-ubuntu24-buildcache-${PLATFORM_TAG}
+      cache_to:
+        - type=registry,ref=ghcr.io/${REPO_NAME}:amazoncorretto21-ubuntu24-buildcache-${PLATFORM_TAG},mode=max
