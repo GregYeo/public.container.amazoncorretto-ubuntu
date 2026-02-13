@@ -104,19 +104,21 @@ jobs:
       - name: Discover and Create Multi-arch Manifests
         env:
           REPO_NAME: ${{ steps.repo_name_step.outputs.repo_name }}
-          VERSION: ${{ steps.vars.outputs.version }}
+          VERSION_TAG: ${{ github.sha }}
+          NAMED_VERSION: ${{ steps.vars.outputs.version }}
         run: |
          SERVICES=$(docker compose config --services)
           
           for SERVICE in $SERVICES; do
             echo "--- Creating Manifest for: $SERVICE ($VERSION) ---"
       
-            AMD64_SOURCE="$REPO_NAME:$SERVICE-$VERSION-linux-amd64"
-            ARM64_SOURCE="$REPO_NAME:$SERVICE-$VERSION-linux-arm64"
+            AMD64_SOURCE="$REPO_NAME:$SERVICE-$VERSION_TAG-linux-amd64"
+            ARM64_SOURCE="$REPO_NAME:$SERVICE-$VERSION_TAG-linux-arm64"
             
             # The final clean multi-arch tags
             docker buildx imagetools create \
-              -t "$REPO_NAME:$SERVICE-$VERSION" \
+              -t "$REPO_NAME:$SERVICE-$VERSION_TAG" \
+              -t "$REPO_NAME:$SERVICE-$NAMED_VERSION" \
               "$AMD64_SOURCE" \
               "$ARM64_SOURCE"
           done
