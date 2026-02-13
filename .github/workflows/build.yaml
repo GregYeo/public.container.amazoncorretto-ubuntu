@@ -57,6 +57,10 @@ jobs:
 
       - name: Push to GHCR
         if: success()
+        env:
+          REPO_NAME: ${{ steps.repo_name_step.outputs.repo_name }}
+          VERSION_TAG: ${{ github.sha }}
+          PLATFORM_TAG: ${{ matrix.platform-tag }}
         run: |
           docker compose push
 

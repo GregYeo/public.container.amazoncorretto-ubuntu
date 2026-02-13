@@ -1,6 +1,6 @@
 services:
   amazoncorretto21-ubuntu24:
-    image: ${REPO_NAME:-public.container.amazoncorretto-ubuntu}:amazoncorretto21-ubuntu24-${VERSION_TAG:-snapshot}
+    image: ${REPO_NAME:-public.container.amazoncorretto-ubuntu}:amazoncorretto21-ubuntu24-${VERSION_TAG:-snapshot}-${PLATFORM_TAG:-unknown_platform}
     build:
       context: .
       dockerfile: Dockerfile
