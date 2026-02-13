@@ -1,12 +1,17 @@
 FROM ubuntu:24.04
 
 RUN apt update -y && \
-    apt install -y \
-    curl gnupg2 software-properties-common && \
+    apt install -y --no-install-recommends \
+      curl gnupg2 software-properties-common && \
     curl -s https://apt.corretto.aws/corretto.key | apt-key add - && \
     add-apt-repository 'deb https://apt.corretto.aws stable main' && \
-    apt-get install -y java-21-amazon-corretto-jdk && \
+    apt update && \
+    apt-get install -y --no-install-recommends \
+      java-21-amazon-corretto-jdk && \
+    apt-get purge -y gnupg2 software-properties-common && \
+    apt-get autoremove -y && \
     apt-get clean all && \
+    rm -rf /var/lib/apt/lists/* && \
     java --version
 
 ENV JAVA_HOME=/usr/lib/jvm/java-21-amazon-corretto
