@@ -5,6 +5,9 @@ on:
     tags:
       - '*'
 
+env:
+  COMPOSE_FILE: 'compose.yml:compose.build.yml'
+
 jobs:
   build-and-push-platform:
     strategy:
@@ -44,17 +47,14 @@ jobs:
           REPO_LOWERCASE=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')
           echo "repo_name=ghcr.io/$REPO_LOWERCASE" >> $GITHUB_OUTPUT
 
-      - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          platforms: ${{ matrix.platform }}
-          pull: true
-          push: true
-          tags: |
-            ${{ steps.repo_name_step.outputs.repo_name }}:${{ github.ref_name }}-${{ matrix.platform-tag }}
-          cache-from: type=registry,ref=${{ steps.repo_name_step.outputs.repo_name }}:buildcache-${{ matrix.platform-tag }}
-          cache-to: type=registry,ref=${{ steps.repo_name_step.outputs.repo_name }}:buildcache-${{ matrix.platform-tag }},mode=max
+      - name: Build and Push with Compose
+        env:
+          REPO_NAME: ${{ steps.repo_name_step.outputs.repo_name }}
+          VERSION_TAG: ${{ github.ref_name }} # Uses the Git Tag
+          PLATFORM_TAG: ${{ matrix.platform-tag }}
+        run: |
+          docker compose build
+          docker compose push
 
   create-manifest:
     name: Create Multi-arch Manifest
@@ -84,11 +84,21 @@ jobs:
           echo "repo_name=ghcr.io/$REPO_LOWERCASE" >> $GITHUB_OUTPUT
 
       - name: Create manifest list and push
+        env:
+          REPO_NAME: ${{ steps.repo_name_step.outputs.repo_name }}
+          VERSION_TAG: ${{ github.ref_name }}
         run: |
-          REPO_NAME=${{ steps.repo_name_step.outputs.repo_name }}
-          TAG_NAME=${{ github.ref_name }}
+          SERVICES=$(docker compose config --services)
           
-          docker buildx imagetools create \
-            -t "$REPO_NAME:$TAG_NAME" \
-            "$REPO_NAME:$TAG_NAME-linux-amd64" \
-            "$REPO_NAME:$TAG_NAME-linux-arm64"
+          for SERVICE in $SERVICES; do
+            echo "--- Creating Manifest for: $SERVICE ($VERSION_TAG) ---"
+          
+            AMD64_SOURCE="$REPO_NAME:$SERVICE-$VERSION_TAG-linux-amd64"
+            ARM64_SOURCE="$REPO_NAME:$SERVICE-$VERSION_TAG-linux-arm64"
+          
+            # Create the final multi-arch tag (e.g., ghcr.io/repo:amazoncorretto21-ubuntu24-v0.2.0)
+            docker buildx imagetools create \
+              -t "$REPO_NAME:$SERVICE-$VERSION_TAG" \
+              "$AMD64_SOURCE" \
+              "$ARM64_SOURCE"
+          done
