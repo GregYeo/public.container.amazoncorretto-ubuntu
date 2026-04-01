@@ -3,8 +3,19 @@ services:
     image: ${REPO_NAME:-public.container.amazoncorretto-ubuntu}:amazoncorretto21-ubuntu24-${VERSION_TAG:-snapshot}-${PLATFORM_TAG:-unknown_platform}
     build:
       context: .
-      dockerfile: Dockerfile
-      #dockerfile: dev.Dockerfile
+      dockerfile: amazoncorretto25.Dockerfile
+    command: bash /test/non_root_user_test.sh
+    environment:
+      ROOT_USER_SCRIPT: /test/root_user_test.sh
+      TARGET_UID: 1001
+      TARGET_GID: 1001
+    volumes:
+      - ./test:/test
+  amazoncorretto25-ubuntu24:
+    image: ${REPO_NAME:-public.container.amazoncorretto-ubuntu}:amazoncorretto25-ubuntu24-${VERSION_TAG:-snapshot}-${PLATFORM_TAG:-unknown_platform}
+    build:
+      context: .
+      dockerfile: amazoncorretto25.Dockerfile
     command: bash /test/non_root_user_test.sh
     environment:
       ROOT_USER_SCRIPT: /test/root_user_test.sh
